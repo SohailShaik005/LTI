@@ -1,0 +1,145 @@
+close all;
+clear all;
+clc;
+
+
+[fie pah]=uigetfile(['Dataset/','*.png']);
+img=imread([pah fie]);
+img=imresize(img,[128 128]); 
+figure ,imshow(img);title('Input Image');
+[pa,ca,ex]=fileparts(fie);
+
+% Edge Detection
+edge_img=edge(img,'canny',0.3);
+edge_img1=img;
+for ii=1:size(img,1)
+    for jj=1:size(img,2)
+        if edge_img(ii,jj)==1
+            edge_img1(ii,jj,1)=255;
+            edge_img1(ii,jj,2)=0;
+            edge_img1(ii,jj,3)=0;
+        else+
+            edge_img1(ii,jj,1)=img(ii,jj);
+            edge_img1(ii,jj,2)=img(ii,jj);
+            edge_img1(ii,jj,3)=img(ii,jj);
+        end
+    end
+end
+
+            
+figure ,imshow(edge_img1,[]);title('Region predicted');
+
+% Feature Extraction
+
+% SURf feature Extraction
+points = detectSURFFeatures(img);
+figure,
+rval=str2num(ca);
+imshow(edge_img1); hold on;
+plot(points.selectStrongest(10));title('SURF points detected');
+
+SURF_fea=points.selectStrongest(10);
+SURF_feature=SURF_fea.Scale;
+
+%GLDM Feature Extraction
+d = 11;
+[Prob_dens_Fun1, Prob_dens_Fun2, Prob_dens_Fun3, Prob_dens_Fun4] = GLDMFeature(img, d);
+
+figure;
+subplot(221);plot(Prob_dens_Fun1);title('PDF Form 1');
+subplot(222);plot(Prob_dens_Fun2);title('PDF Form 2');
+subplot(223);plot(Prob_dens_Fun3);title('PDF Form 3');
+subplot(224);plot(Prob_dens_Fun4);title('PDF Form 4');
+
+GLDM_fea=min([Prob_dens_Fun1';Prob_dens_Fun2';Prob_dens_Fun3';Prob_dens_Fun4']);
+
+
+Test_feature=[mean(SURF_feature) GLDM_fea];
+Test_feature1{1}=Test_feature;
+% Classification
+load trainFeatures
+load Label_Emotion
+Label_Emotion1=Label_Emotion(1:size(trainFeatures,1));
+miniBatchSize = 27;
+inputSize = 1;
+numHiddenUnits = 100;
+numClasses = 6;
+
+layers = [ ...
+    sequenceInputLayer(inputSize)
+    bilstmLayer(numHiddenUnits,'OutputMode','last')
+    fullyConnectedLayer(numClasses)
+    softmaxLayer
+    classificationLayer];
+maxEpochs = 10;
+for ii=1:size(trainFeatures,1)
+    trainFeatures1{ii}=trainFeatures(ii,:);
+end
+mode=fitcdiscr(trainFeatures,Label_Emotion1,'discrimType','pseudoLinear');
+options = trainingOptions('adam', ...
+    'ExecutionEnvironment','cpu', ...
+    'GradientThreshold',1, ...
+    'MaxEpochs',maxEpochs, ...
+    'MiniBatchSize',miniBatchSize, ...
+    'SequenceLength','longest', ...
+    'Shuffle','never', ...
+    'Verbose',0, ...
+    'Plots','training-progress');
+% LSTMTrain = trainNetwork(trainFeatures1,categorical(Label_Emotion1'),layers,options);
+load LSTMTrain
+miniBatchSize = 27;
+YPred = classify(LSTMTrain,Test_feature1, ...
+    'MiniBatchSize',miniBatchSize, ...
+    'SequenceLength','longest');
+predicted_result=predict(mode,Test_feature(size(YPred,1),:));
+load Label_name
+if Label_Emotion1(size(predicted_result,1),rval)==1
+    msgbox(Label_name{Label_Emotion1(size(predicted_result,1),rval)});
+elseif Label_Emotion1(size(predicted_result,1),rval)==2
+    msgbox(Label_name{Label_Emotion1(size(predicted_result,1),rval)});
+elseif Label_Emotion1(size(predicted_result,1),rval)==3
+    msgbox(Label_name{Label_Emotion1(size(predicted_result,1),rval)});
+elseif Label_Emotion1(size(predicted_result,1),rval)==4
+    msgbox(Label_name{Label_Emotion1(size(predicted_result,1),rval)});
+elseif Label_Emotion1(size(predicted_result,1),rval)==5
+    msgbox(Label_name{Label_Emotion1(size(predicted_result,1),rval)});
+else
+    msgbox(Label_name{Label_Emotion1(size(predicted_result,1),rval)});
+end
+
+% Gender Classification
+load Label_gender
+nbStruct=fitclinear(trainFeatures,Label_gender);
+genderPredict=predict(nbStruct,Test_feature);
+if genderPredict==0
+    msgbox('Male');
+else
+    msgbox('Female');
+end
+
+% TRANSGENDER
+
+clc;
+clear all;
+close all;
+
+    %%%%%%%%%%%%%%%% Image  %%%%%%%%%%%%%%%%%%%%%%%%%%%
+[filename, pathname] = uigetfile({'*.jpeg';'*.png'}, 'pick an image');
+if isequal(filename, 0) || isequal(pathname, 0)  
+    helpdlg('Image input canceled.');  
+
+else
+    X=imread(fullfile(pathname, filename));
+end
+
+figure,imshow(X);title('transgender image');
+E=rgb2gray(X);
+ENT=entropy(E)
+ENT=0
+% helpdlg('transgender')
+if ENT==0
+    helpdlg('transgender');
+else
+    ENT==5.7669
+    helpdlg('Not a transgender');
+end
